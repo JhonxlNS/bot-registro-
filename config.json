@@ -1,0 +1,13 @@
+{
+  "TOKEN": "SEU_TOKEN_AQUI",
+  "auto_roles": {},
+  "tag_config": {},
+  "register_channels": {},
+  "approval_channels": {},
+  "admins": [],
+  "super_admins": [],
+  "settings": {
+    "approval_enabled": true,
+    "auto_nickname": true
+  }
+}
