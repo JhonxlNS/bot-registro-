@@ -1,26 +1,35 @@
 """
-main.py - Bot de Registro Discord 100% Funcional
-Compatível com: Shard Cloud, Railway, Render, VPS, etc.
+BOT DE REGISTRO DISCORD - VERSÃO FINAL 100% FUNCIONAL
 """
 
-import discord
-from discord import app_commands
 import os
+import sys
 import json
+import time
+
+print("=" * 60)
+print("🤖 BOT DE REGISTRO DISCORD - VERSÃO FINAL")
+print("=" * 60)
+print(f"🐍 Python: {sys.version.split()[0]}")
+print("=" * 60)
+
+# ========== IMPORT DISCORD PRIMEIRO ==========
+try:
+    import discord
+    from discord import app_commands
+    print(f"✅ Discord.py {discord.__version__} importado!")
+except ImportError as e:
+    print(f"❌ Erro ao importar discord: {e}")
+    print("📦 Instalando dependências...")
+    os.system("pip install discord.py==2.3.2 Flask==2.3.3")
+    import discord
+    from discord import app_commands
+
 import datetime
 import asyncio
-import time
 from typing import Optional
 
-# ================= CONFIGURAÇÃO INICIAL =================
-print("=" * 60)
-print("🤖 BOT DE REGISTRO DISCORD - 100% GARANTIDO")
-print("=" * 60)
-print(f"🐍 Python: {os.sys.version}")
-print(f"📁 Diretório: {os.getcwd()}")
-print("=" * 60)
-
-# Configurar intents
+# ========== CONFIGURAÇÃO DO BOT ==========
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
@@ -38,15 +47,30 @@ class RegistrationBot(discord.Client):
             print(f"✅ {len(synced)} comandos sincronizados")
         except Exception as e:
             print(f"⚠️ Erro ao sincronizar: {e}")
-        print("✅ Bot pronto para uso!")
+        
+        # Atividade
+        await self.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name="sistema de registro"
+            )
+        )
 
 bot = RegistrationBot()
 
-# ================= CONFIGURAÇÕES =================
+# ========== CONFIGURAÇÕES ==========
 CONFIG_FILE = "config.json"
 
 def load_config():
-    """Carrega ou cria configuração"""
+    """Carrega configurações"""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    
+    # Configuração padrão
     default_config = {
         "TOKEN": os.environ.get("DISCORD_TOKEN", "SEU_TOKEN_AQUI"),
         "auto_roles": {},
@@ -62,31 +86,26 @@ def load_config():
     }
     
     try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                # Garantir que tem todas as chaves
-                for key in default_config:
-                    if key not in config:
-                        config[key] = default_config[key]
-                return config
-        else:
-            return default_config
-    except Exception:
-        return default_config
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(default_config, f, indent=2, ensure_ascii=False)
+        print("✅ config.json criado")
+    except:
+        pass
+    
+    return default_config
 
 def save_config(config):
-    """Salva configuração"""
+    """Salva configurações"""
     try:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
         return True
-    except Exception:
+    except:
         return False
 
 config = load_config()
 
-# ================= FUNÇÕES AUXILIARES =================
+# ========== FUNÇÕES AUXILIARES ==========
 def is_admin(interaction):
     """Verifica se é admin"""
     user = interaction.user
@@ -100,7 +119,7 @@ def is_admin(interaction):
         return True
     return False
 
-async def update_user_nickname(member, nome, user_id_num, guild_id):
+async def update_nickname(member, nome, user_id_num, guild_id):
     """Atualiza nickname"""
     tag = config["tag_config"].get(str(guild_id), "")
     
@@ -118,21 +137,17 @@ async def update_user_nickname(member, nome, user_id_num, guild_id):
     except:
         return False, "Erro"
 
-# ================= COMANDOS SLASH =================
+# ========== COMANDOS SLASH ==========
 
-# === CONFIGURAÇÃO ===
 @bot.tree.command(name="setup", description="Configurar sistema de registro")
 @app_commands.describe(
-    tag="Tag para novos membros",
+    tag="Tag para novos membros (ex: 77K)",
     cargo="Cargo automático",
     canal_registro="Canal de registro",
     canal_aprovacao="Canal de aprovação"
 )
-async def setup(interaction: discord.Interaction, 
-                tag: str, 
-                cargo: discord.Role, 
-                canal_registro: discord.TextChannel, 
-                canal_aprovacao: discord.TextChannel):
+async def setup(interaction: discord.Interaction, tag: str, cargo: discord.Role, 
+                canal_registro: discord.TextChannel, canal_aprovacao: discord.TextChannel):
     
     if not is_admin(interaction):
         await interaction.response.send_message("❌ Apenas administradores!", ephemeral=True)
@@ -140,6 +155,7 @@ async def setup(interaction: discord.Interaction,
     
     guild_id = str(interaction.guild.id)
     
+    # Salvar configurações
     config["tag_config"][guild_id] = tag
     config["auto_roles"][guild_id] = cargo.id
     config["register_channels"][guild_id] = canal_registro.id
@@ -148,12 +164,14 @@ async def setup(interaction: discord.Interaction,
     if save_config(config):
         embed = discord.Embed(
             title="✅ SISTEMA CONFIGURADO",
+            description="Tudo configurado com sucesso!",
             color=discord.Color.green()
         )
-        embed.add_field(name="🏷️ Tag", value=tag, inline=True)
+        
+        embed.add_field(name="🏷️ Tag", value=f"`{tag}`", inline=True)
         embed.add_field(name="🎭 Cargo", value=cargo.mention, inline=True)
-        embed.add_field(name="📝 Registro", value=canal_registro.mention, inline=True)
-        embed.add_field(name="✅ Aprovação", value=canal_aprovacao.mention, inline=True)
+        embed.add_field(name="📝 Canal de Registro", value=canal_registro.mention, inline=True)
+        embed.add_field(name="✅ Canal de Aprovação", value=canal_aprovacao.mention, inline=True)
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
         
@@ -161,23 +179,29 @@ async def setup(interaction: discord.Interaction,
         await create_painel_registro(canal_registro, guild_id, tag, cargo)
         await create_painel_aprovacao(canal_aprovacao, guild_id)
     else:
-        await interaction.response.send_message("❌ Erro ao salvar!", ephemeral=True)
+        await interaction.response.send_message("❌ Erro ao salvar configuração!", ephemeral=True)
 
 async def create_painel_registro(channel, guild_id, tag, cargo):
     """Cria painel de registro"""
     embed = discord.Embed(
         title="📝 REGISTRO NO SERVIDOR",
-        description="Clique no botão abaixo para se registrar!",
+        description=(
+            "**Clique no botão abaixo para solicitar registro!**\n\n"
+            "📋 **Informações necessárias:**\n"
+            "• Nome completo\n"
+            "• Seu ID\n"
+            "• Quem te recrutou\n\n"
+            f"🏷️ **Seu nickname será:** `{tag}・NOME | ID`\n"
+            f"🎭 **Cargo recebido:** {cargo.mention}"
+        ),
         color=discord.Color.blue()
     )
-    
-    embed.add_field(name="🏷️ Seu nickname será", value=f"`{tag}・NOME | ID`", inline=False)
-    embed.add_field(name="🎭 Cargo recebido", value=cargo.mention, inline=False)
     
     button = discord.ui.Button(
         style=discord.ButtonStyle.primary,
         label="📝 Solicitar Registro",
-        custom_id=f"registrar_{guild_id}"
+        custom_id=f"registrar_{guild_id}",
+        emoji="📝"
     )
     
     view = discord.ui.View(timeout=None)
@@ -189,20 +213,28 @@ async def create_painel_aprovacao(channel, guild_id):
     """Cria painel de aprovação"""
     embed = discord.Embed(
         title="✅ PAINEL DE APROVAÇÃO",
-        description="Solicitações aparecerão aqui para aprovação da staff.",
+        description=(
+            "**Solicitações de registro aparecerão aqui**\n\n"
+            "👨‍⚖️ **Para a staff:**\n"
+            "• Use ✅ para aprovar registros\n"
+            "• Use ❌ para recusar registros\n\n"
+            "⚙️ **Processo automático:**\n"
+            "• Tag aplicada automaticamente\n"
+            "• Cargo dado automaticamente\n"
+            "• Usuário notificado via DM"
+        ),
         color=discord.Color.green()
     )
     
     await channel.send(embed=embed)
 
-# === REGISTRO ===
 class RegistroModal(discord.ui.Modal, title="📝 Formulário de Registro"):
     def __init__(self, guild_id):
         super().__init__()
         self.guild_id = guild_id
     
     nome = discord.ui.TextInput(
-        label="Nome completo",
+        label="Seu nome completo",
         placeholder="Ex: João Silva",
         max_length=32,
         required=True
@@ -210,14 +242,14 @@ class RegistroModal(discord.ui.Modal, title="📝 Formulário de Registro"):
     
     user_id = discord.ui.TextInput(
         label="Seu ID",
-        placeholder="Ex: 1001, 777",
+        placeholder="Ex: 1001, 777, 888",
         max_length=10,
         required=True
     )
     
     recrutador = discord.ui.TextInput(
         label="Quem te recrutou?",
-        placeholder="Nome do recrutador",
+        placeholder="Nome da pessoa que te indicou",
         max_length=32,
         required=True
     )
@@ -226,41 +258,51 @@ class RegistroModal(discord.ui.Modal, title="📝 Formulário de Registro"):
         await interaction.response.defer(ephemeral=True)
         
         guild = interaction.guild
-        app_channel_id = config["approval_channels"].get(self.guild_id)
+        member = interaction.user
         
+        # Verificar canal de aprovação
+        app_channel_id = config["approval_channels"].get(self.guild_id)
         if not app_channel_id:
-            await interaction.followup.send("❌ Sistema não configurado!", ephemeral=True)
+            await interaction.followup.send("❌ Sistema não configurado! Use /setup primeiro.", ephemeral=True)
             return
         
         app_channel = guild.get_channel(app_channel_id)
         if not app_channel:
-            await interaction.followup.send("❌ Canal não encontrado!", ephemeral=True)
+            await interaction.followup.send("❌ Canal de aprovação não encontrado!", ephemeral=True)
             return
         
-        # Criar embed da solicitação
+        # Embed da solicitação
         embed = discord.Embed(
-            title="🔄 NOVA SOLICITAÇÃO",
-            description=f"Usuário: {interaction.user.mention}",
-            color=discord.Color.orange()
+            title="🔄 NOVA SOLICITAÇÃO DE REGISTRO",
+            description=f"Usuário: {member.mention}",
+            color=discord.Color.orange(),
+            timestamp=datetime.datetime.now()
         )
         
         embed.add_field(name="👤 Nome", value=self.nome.value, inline=True)
         embed.add_field(name="#️⃣ ID", value=self.user_id.value, inline=True)
         embed.add_field(name="👥 Recrutador", value=self.recrutador.value, inline=True)
-        embed.add_field(name="🆔 Discord ID", value=interaction.user.id, inline=True)
+        embed.add_field(name="🆔 Discord ID", value=member.id, inline=True)
         embed.add_field(name="📅 Data", value=datetime.datetime.now().strftime("%d/%m %H:%M"), inline=True)
         
         # Botões de aprovação
         view = AprovacaoView(
-            user_id=interaction.user.id,
+            user_id=member.id,
             nome=self.nome.value,
             user_id_num=self.user_id.value,
             recrutador=self.recrutador.value,
             guild_id=self.guild_id
         )
         
+        # Enviar para canal de aprovação
         await app_channel.send(embed=embed, view=view)
-        await interaction.followup.send("✅ Solicitação enviada para aprovação!", ephemeral=True)
+        
+        await interaction.followup.send(
+            "✅ **Solicitação enviada com sucesso!**\n"
+            f"📋 Sua solicitação foi enviada para {app_channel.mention}\n"
+            "⏳ Aguarde a aprovação da staff.",
+            ephemeral=True
+        )
 
 class AprovacaoView(discord.ui.View):
     def __init__(self, user_id, nome, user_id_num, recrutador, guild_id):
@@ -271,30 +313,34 @@ class AprovacaoView(discord.ui.View):
         self.recrutador = recrutador
         self.guild_id = guild_id
     
-    @discord.ui.button(label="✅ Aprovar", style=discord.ButtonStyle.success)
-    async def aprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="✅ Aprovar", style=discord.ButtonStyle.success, custom_id="aprovar_btn")
+    async def aprovar_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_admin(interaction):
-            await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
+            await interaction.response.send_message("❌ Apenas staff pode aprovar!", ephemeral=True)
             return
         
         await interaction.response.defer()
         
-        member = interaction.guild.get_member(self.user_id)
+        guild = interaction.guild
+        member = guild.get_member(self.user_id)
+        
         if not member:
+            # Atualizar embed se usuário não encontrado
             embed = interaction.message.embeds[0]
             embed.title = "❌ USUÁRIO NÃO ENCONTRADO"
             embed.color = discord.Color.red()
             await interaction.message.edit(embed=embed, view=None)
+            await interaction.followup.send("❌ Usuário saiu do servidor!", ephemeral=True)
             return
         
-        # Atualizar nickname
-        success_nick, nickname = await update_user_nickname(member, self.nome, self.user_id_num, self.guild_id)
+        # 1. Atualizar nickname
+        success_nick, nickname = await update_nickname(member, self.nome, self.user_id_num, self.guild_id)
         
-        # Aplicar cargo
-        cargo_id = config["auto_roles"].get(self.guild_id)
+        # 2. Aplicar cargo
         cargo_added = False
+        cargo_id = config["auto_roles"].get(self.guild_id)
         if cargo_id:
-            cargo = interaction.guild.get_role(cargo_id)
+            cargo = guild.get_role(cargo_id)
             if cargo:
                 try:
                     await member.add_roles(cargo)
@@ -302,55 +348,80 @@ class AprovacaoView(discord.ui.View):
                 except:
                     pass
         
-        # Atualizar embed
+        # 3. Atualizar embed da solicitação
         embed = interaction.message.embeds[0]
         embed.title = "✅ REGISTRO APROVADO"
         embed.color = discord.Color.green()
         embed.add_field(name="👤 Aprovado por", value=interaction.user.mention, inline=True)
         
         if success_nick:
-            embed.add_field(name="🏷️ Nickname", value=nickname, inline=True)
+            embed.add_field(name="🏷️ Nickname Atualizado", value=nickname, inline=True)
+        
+        if cargo_added:
+            embed.add_field(name="🎭 Cargo", value="✅ Aplicado", inline=True)
+        
+        embed.add_field(name="⏰ Hora", value=datetime.datetime.now().strftime("%H:%M:%S"), inline=True)
         
         await interaction.message.edit(embed=embed, view=None)
         
-        # Notificar usuário
+        # 4. Notificar usuário
         try:
-            await member.send(f"🎉 Seu registro foi aprovado por {interaction.user.name}!")
+            notify_embed = discord.Embed(
+                title="🎉 SEU REGISTRO FOI APROVADO!",
+                description=f"Bem-vindo(a) ao **{guild.name}**!",
+                color=discord.Color.green()
+            )
+            
+            if success_nick:
+                notify_embed.add_field(name="🏷️ Seu Nickname", value=nickname, inline=False)
+            
+            notify_embed.add_field(name="👤 Aprovado por", value=interaction.user.name, inline=True)
+            
+            await member.send(embed=notify_embed)
         except:
-            pass
+            pass  # Usuário tem DM bloqueada
         
         await interaction.followup.send(f"✅ {member.mention} registrado com sucesso!", ephemeral=True)
     
-    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger)
-    async def recusar(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="❌ Recusar", style=discord.ButtonStyle.danger, custom_id="recusar_btn")
+    async def recusar_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_admin(interaction):
-            await interaction.response.send_message("❌ Apenas staff!", ephemeral=True)
+            await interaction.response.send_message("❌ Apenas staff pode recusar!", ephemeral=True)
             return
         
         embed = interaction.message.embeds[0]
         embed.title = "❌ REGISTRO RECUSADO"
         embed.color = discord.Color.red()
         embed.add_field(name="👤 Recusado por", value=interaction.user.mention, inline=True)
+        embed.add_field(name="⏰ Hora", value=datetime.datetime.now().strftime("%H:%M:%S"), inline=True)
         
         await interaction.message.edit(embed=embed, view=None)
+        
+        # Notificar usuário
+        try:
+            member = interaction.guild.get_member(self.user_id)
+            if member:
+                await member.send(f"❌ Seu registro no **{interaction.guild.name}** foi recusado pela staff.")
+        except:
+            pass
+        
         await interaction.response.send_message("❌ Registro recusado!", ephemeral=True)
 
-# === COMANDOS ADMIN ===
 @bot.tree.command(name="add_admin", description="Adicionar administrador")
 @app_commands.describe(usuario="Usuário para tornar admin")
 async def add_admin(interaction: discord.Interaction, usuario: discord.User):
     if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ Apenas administradores!", ephemeral=True)
+        await interaction.response.send_message("❌ Apenas administradores do servidor!", ephemeral=True)
         return
     
     if usuario.id not in config["admins"]:
         config["admins"].append(usuario.id)
         if save_config(config):
-            await interaction.response.send_message(f"✅ {usuario.mention} adicionado como admin!", ephemeral=True)
+            await interaction.response.send_message(f"✅ {usuario.mention} adicionado como administrador!", ephemeral=True)
         else:
             await interaction.response.send_message("❌ Erro ao salvar!", ephemeral=True)
     else:
-        await interaction.response.send_message(f"⚠️ {usuario.mention} já é admin!", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ {usuario.mention} já é administrador!", ephemeral=True)
 
 @bot.tree.command(name="list_admins", description="Listar administradores")
 async def list_admins(interaction: discord.Interaction):
@@ -366,15 +437,14 @@ async def list_admins(interaction: discord.Interaction):
             user = interaction.guild.get_member(user_id)
             if user:
                 admins_text += f"• {user.mention}\n"
-        embed.description = admins_text or "Nenhum admin configurado"
+        embed.description = admins_text or "Nenhum admin"
     else:
         embed.description = "Nenhum admin configurado"
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# === FERRAMENTAS ===
 @bot.tree.command(name="limpar", description="Limpar mensagens")
-@app_commands.describe(quantidade="Quantidade de mensagens")
+@app_commands.describe(quantidade="Quantidade de mensagens (máx 100)")
 async def limpar(interaction: discord.Interaction, quantidade: int = 100):
     if not is_admin(interaction):
         await interaction.response.send_message("❌ Apenas administradores!", ephemeral=True)
@@ -420,13 +490,13 @@ async def ajuda(interaction: discord.Interaction):
     
     embed.add_field(
         name="🔧 CONFIGURAÇÃO",
-        value="`/setup` - Configurar tudo\n`/add_admin` - Adicionar admin\n`/list_admins` - Listar admins",
+        value="`/setup` - Configurar sistema\n`/add_admin` - Adicionar admin\n`/list_admins` - Listar admins",
         inline=False
     )
     
     embed.add_field(
         name="🛠️ FERRAMENTAS",
-        value="`/limpar` - Limpar mensagens\n`/status` - Ver status\n`/ajuda` - Esta mensagem",
+        value="`/limpar` - Limpar mensagens\n`/status` - Ver status\n`/ajuda` - Esta mensagem\n`/ping` - Testar latência",
         inline=False
     )
     
@@ -437,102 +507,101 @@ async def ping(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
     await interaction.response.send_message(f"🏓 Pong! {latency}ms", ephemeral=True)
 
-# === EVENTOS ===
+# ========== EVENTOS ==========
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como: {bot.user}")
     print(f"📊 Servidores: {len(bot.guilds)}")
+    print(f"👥 Total de usuários: {sum(g.member_count for g in bot.guilds)}")
     print(f"⏰ Iniciado em: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     print("=" * 60)
-    
-    # Definir atividade
-    await bot.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.watching,
-            name=f"{len(bot.guilds)} servidores"
-        )
-    )
 
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
-    if interaction.type == discord.InteractionType.component:
-        custom_id = interaction.data.get('custom_id', '')
-        
-        if custom_id.startswith("registrar_"):
-            guild_id = custom_id.replace("registrar_", "")
-            
-            # Verificar canal correto
-            reg_channel_id = config["register_channels"].get(guild_id)
-            if not reg_channel_id or interaction.channel.id != reg_channel_id:
-                await interaction.response.send_message("❌ Use no canal correto!", ephemeral=True)
-                return
-            
-            modal = RegistroModal(guild_id)
-            await interaction.response.send_modal(modal)
-
-# ================= SERVIDOR WEB (keep_alive embutido) =================
-from flask import Flask
-from threading import Thread
-import requests
-
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def home():
-    return "🤖 Bot Discord Online - Sistema de Registro"
-
-@flask_app.route('/health')
-def health():
-    return "OK", 200
-
-@flask_app.route('/ping')
-def ping():
-    return "pong", 200
-
-def run_flask():
-    port = int(os.environ.get('PORT', 8080))
-    flask_app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
-
-def start_web_server():
-    """Inicia servidor web em thread separada"""
+    """Manipula interações de botões"""
     try:
-        server_thread = Thread(target=run_flask, daemon=True)
-        server_thread.start()
-        print(f"✅ Servidor web iniciado na porta {os.environ.get('PORT', 8080)}")
-        return True
+        if interaction.type == discord.InteractionType.component:
+            custom_id = interaction.data.get('custom_id', '')
+            
+            if custom_id.startswith("registrar_"):
+                guild_id = custom_id.replace("registrar_", "")
+                
+                # Verificar se é o canal correto
+                reg_channel_id = config["register_channels"].get(guild_id)
+                if not reg_channel_id or interaction.channel.id != reg_channel_id:
+                    await interaction.response.send_message(
+                        "❌ Use o botão no canal de registro correto!",
+                        ephemeral=True
+                    )
+                    return
+                
+                modal = RegistroModal(guild_id)
+                await interaction.response.send_modal(modal)
     except Exception as e:
-        print(f"⚠️ Servidor web não iniciado: {e}")
-        return False
+        print(f"Erro na interação: {e}")
 
-# ================= INICIALIZAÇÃO =================
+# ========== SERVIDOR WEB SIMPLES ==========
+try:
+    from flask import Flask
+    from threading import Thread
+    
+    app = Flask(__name__)
+    
+    @app.route('/')
+    def home():
+        return "🤖 Bot Discord Online - Sistema de Registro"
+    
+    @app.route('/health')
+    def health():
+        return "OK", 200
+    
+    @app.route('/ping')
+    def ping():
+        return "pong", 200
+    
+    def run_flask():
+        port = int(os.environ.get('PORT', 8080))
+        app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+    
+    def start_web_server():
+        """Inicia servidor web em thread separada"""
+        try:
+            server_thread = Thread(target=run_flask, daemon=True)
+            server_thread.start()
+            print(f"✅ Servidor web iniciado na porta {os.environ.get('PORT', 8080)}")
+            return True
+        except Exception as e:
+            print(f"⚠️ Servidor web não iniciado: {e}")
+            return False
+    
+    # Iniciar servidor web
+    start_web_server()
+    
+except ImportError:
+    print("⚠️ Flask não instalado, servidor web não iniciado")
+    print("💡 Para servidor web, adicione 'Flask' no requirements.txt")
+
+# ========== INICIALIZAÇÃO ==========
 def main():
-    print("=" * 60)
-    print("🚀 INICIANDO BOT DE REGISTRO DISCORD")
-    print("=" * 60)
+    print("🚀 Iniciando bot Discord...")
     
-    # Verificar token
+    # Token
     token = config.get("TOKEN")
-    
     if not token or token == "SEU_TOKEN_AQUI":
         token = os.environ.get("DISCORD_TOKEN")
     
     if not token or token == "SEU_TOKEN_AQUI":
         print("\n❌ TOKEN NÃO CONFIGURADO!")
         print("\n📝 CONFIGURAÇÃO:")
-        print("1. No painel da hospedagem, adicione:")
-        print("   Variável: DISCORD_TOKEN")
-        print("   Valor: Seu token do bot")
-        print("\n2. Ou edite config.json e adicione seu token")
+        print("1. No painel da Discloud, vá em 'Environment'")
+        print("2. Adicione: DISCORD_TOKEN")
+        print("3. Cole seu token do bot")
+        print("\n📍 Obtenha o token em: https://discord.com/developers/applications")
         print("=" * 60)
         return
     
-    print("✅ Token encontrado")
-    print("🌐 Iniciando servidor web...")
-    
-    # Iniciar servidor web
-    start_web_server()
-    
-    print("🤖 Iniciando bot Discord...")
+    print("✅ Token configurado")
+    print("🤖 Conectando ao Discord...")
     print("=" * 60)
     
     try:
@@ -541,7 +610,7 @@ def main():
         print("❌ TOKEN INVÁLIDO!")
         print("Verifique se o token está correto")
     except Exception as e:
-        print(f"❌ Erro: {e}")
+        print(f"❌ Erro inesperado: {e}")
 
 if __name__ == "__main__":
     main()
